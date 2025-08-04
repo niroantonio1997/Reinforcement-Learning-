@@ -1,0 +1,25 @@
+pendulum: 
+  env_id: Pendulum-v1
+  gamma: 0.99
+  tau: 0.005  # Leggermente più alto per convergenza più veloce
+  batch_size: 64
+  exploration_noise_std: 0.1  
+  buffer_size: 100000  
+  train_freq: 1           # Train ad ogni step (molto importante!)
+  max_episode_steps: 200  # Default di Pendulum
+  total_timesteps: 100000  # Riduci per test più veloci
+  max_reward: 10000
+
+
+
+walker: 
+  env_id: BipedalWalker-v3
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.2
+  buffer_size: 2000000
+  train_freq: 1
+  max_episode_steps: 1600  # Default di BipedalWalker
+  total_timesteps: 3000000
+  max_reward: 300

@@ -1,0 +1,43 @@
+cartpole: 
+  env_id: CartPole-v1
+  replay_memory_size: 1000000
+  mini_batch_size: 32 
+  epsilon_init: 1
+  epsilon_decay: 0.99995
+  epsilon_min: 0.0005
+  network_sync_rate: 100
+  learning_rate_a: 0.001
+  discount_factor_g: 0.999
+  num_episodes: 40000
+  max_reward: 5000
+  max_steps: 1000000
+
+  
+flappybird: 
+  env_id: FlappyBird-v0
+  replay_memory_size: 10000000
+  mini_batch_size: 128
+  epsilon_init: 1
+  epsilon_decay: 0.99985
+  epsilon_min: 0.00005
+  network_sync_rate: 1000
+  learning_rate_a: 0.00005
+  discount_factor_g: 0.999
+  num_episodes: 100000
+  max_reward: 1000
+  max_steps: 1000000
+
+acrobot: 
+  env_id: Acrobot-v1
+  replay_memory_size: 1000000
+  mini_batch_size: 64 
+  epsilon_init: 1
+  epsilon_decay: 0.999995
+  epsilon_min: 0.0005
+  network_sync_rate: 1000
+  learning_rate_a: 0.001
+  discount_factor_g: 0.995
+  num_episodes: 40000
+  max_reward: -85
+  max_steps: 500
+  
