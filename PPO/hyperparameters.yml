@@ -33,7 +33,6 @@ cartpole:
   entropy_coef: 0.02  # Più exploration
   entropy_coef_decay: 0.998  # Decay più lento
   epsilon: 0.2
-  minibatch_size: 128  # Batch più grandi
 
 lunarlander:
   env_id: LunarLander-v3
@@ -71,7 +70,6 @@ pendulum:
   std: 0.4                 # Std più alta per esplorazione iniziale
   std_decay: 0.998         # Decay molto lento
   epsilon: 0.2
-  minibatch_size: 128      # Batch più grandi per stabilità
   lambda: 0.95
 
 mountaincar:
@@ -93,7 +91,6 @@ mountaincar:
   std: 0.4  # Aumentato per migliore esplorazione
   std_decay: 0.995  # Decay più lento
   epsilon: 0.2
-  minibatch_size: 64
   lambda: 0.95
 
 # Ambienti con azioni continue avanzati
@@ -116,7 +113,6 @@ bipedalwalker:
   std: 0.1              # Std bassa per controllo preciso
   std_decay: 0.9995     # Decay lento
   epsilon: 0.2
-  minibatch_size: 128
   lambda: 0.95
 
 humanoid:
@@ -138,7 +134,6 @@ humanoid:
   std: 0.1
   std_decay: 0.9999    # Decay molto lento
   epsilon: 0.2
-  minibatch_size: 16000  # Batch grandi
   lambda: 0.95
 
 ant:
@@ -160,7 +155,6 @@ ant:
   std: 0.2
   std_decay: 0.999
   epsilon: 0.2
-  minibatch_size: 4096
   lambda: 0.95
 
 hopper:
@@ -182,7 +176,6 @@ hopper:
   std: 0.3
   std_decay: 0.998
   epsilon: 0.2
-  minibatch_size: 2048
   lambda: 0.95
   max_reward: 3000  # Aggiornato per il nuovo ambiente Hopper-v5
 
@@ -205,7 +198,6 @@ walker2d:
   std: 0.1
   std_decay: 0.998
   epsilon: 0.2
-  minibatch_size: 64
   lambda: 0.95
 
 halfcheetah:
@@ -216,18 +208,17 @@ halfcheetah:
   max_episode_steps: 1000
   max_episodes: 2500
   total_timesteps: 1000000
-  max_reward: 12000
+  max_average_reward: 1500
   action_type: continuous
   actor_hidden_dims: [256, 256]
   critic_hidden_dims: [256, 256]
   actor_lr: 3e-4
   critic_lr: 1e-3
-  entropy_coef: 0.005  # Bassa entropy per velocità
+  entropy_coef: 0.1  # Bassa entropy per velocità
   entropy_coef_decay: 0.999
   std: 0.1
   std_decay: 0.9995
   epsilon: 0.2
-  minibatch_size: 128
   lambda: 0.95
 
 # Ambienti con spazio di controllo più semplice
@@ -250,7 +241,6 @@ invertedpendulum:
   std: 0.3
   std_decay: 0.995
   epsilon: 0.2
-  minibatch_size: 32
   lambda: 0.95
 
 inverteddoublependulum:
@@ -272,5 +262,4 @@ inverteddoublependulum:
   std: 0.2
   std_decay: 0.995
   epsilon: 0.2
-  minibatch_size: 64
   lambda: 0.95

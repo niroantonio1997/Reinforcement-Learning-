@@ -25,6 +25,7 @@ class PPOAgent:
             all_hyperparameters_set = yaml.safe_load(file) 
             hyperparameters = all_hyperparameters_set[hyperparameters_set]
         
+        self.hyperparameters_set = hyperparameters_set  # Salva il nome del set per i path
         self.gamma = hyperparameters["gamma"]
         self.lam = hyperparameters.get("lambda", 0.95)  # GAE lambda parameter
         self.buffer_size = hyperparameters["buffer_size"]
@@ -41,7 +42,7 @@ class PPOAgent:
         self.entropy_coef = hyperparameters.get("entropy_coef", 0.01)
         self.entropy_coef_decay = hyperparameters.get("entropy_coef_decay", 0.99)
         self.epsilon = hyperparameters.get("epsilon", 0.2)  # Clip range for PPO
-        self.minibatch_size = hyperparameters.get("minibatch_size", 64)  # Minibatch size
+        self.minibatch_size = self.buffer_size
         self.max_average_reward = hyperparameters["max_average_reward"]
         
         # Per azioni continue
@@ -51,6 +52,17 @@ class PPOAgent:
         # Variables for interrupt handling
         self.episodes_reward = []
         self.interrupted = False
+        
+    def save_episode_video(self, frames, episode_num):
+        """
+        Save a sequence of frames as a video
+        """
+        if len(frames) > 0:
+            import imageio
+            filename = f'PPO/video/{self.hyperparameters_set}/episode_{episode_num}_{self.env_id}.mp4'
+            # Salva come video MP4 con 30 fps
+            imageio.mimsave(filename, frames, fps=30, codec='libx264')
+            print(f"Episode video saved as {filename}")
         
         
     #gestisce il segnale di interruzione Ctrl+C. Plotta i dati di training e salva i modelli    
@@ -222,18 +234,18 @@ class PPOAgent:
         
     def run(self, is_training):
 
-        env = gym.make(self.env_id, render_mode="human" if not is_training else "None",camera_name="track",width=1200, height=800)
-
-        obs_space = env.observation_space.shape[0]
-        
-        if self.action_type == 'continuous':
-            action_dim = env.action_space.shape[0]
-            self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32).to(device)
-            self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32).to(device)
-        else:
-            action_dim = env.action_space.n
-
         if is_training:
+            env = gym.make(self.env_id, render_mode="rgb_array",camera_name="track",width=1200, height=800)# if not is_training else "None",camera_name="track",width=1200, height=800)
+
+            obs_space = env.observation_space.shape[0]
+
+            if self.action_type == 'continuous':
+                action_dim = env.action_space.shape[0]
+                self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32).to(device)
+                self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32).to(device)
+            else:
+                action_dim = env.action_space.n
+            
             # Setup signal handler for Ctrl+C
             signal.signal(signal.SIGINT, self.signal_handler)
             print("=== TRAINING STARTED ===")
@@ -266,9 +278,15 @@ class PPOAgent:
             self.best_reward = -np.inf
             
             for episode in range(self.max_episodes):
-                if (episode + 1) % (self.max_episodes / 10) == 0:
+                render_flag = False 
+                save_video = False
+                frames = []  # Lista per salvare i frame del video
+                
+                if (episode) % (self.max_episodes // 10) == 0:
                     self.buffer_size = int(self.buffer_size * 1.1)  # Aumenta la dimensione del buffer per gli episodi successivi
                     self.replay_buffer = ReplayBuffer(obs_space, action_dim, self.buffer_size, buffer_type)
+                    save_video = True  # Abilita il rendering ogni 10% degli episodi per monitorare i progressi
+                # Reset environment
                 obs, _ = env.reset()
                 done = False
                 episode_reward = 0
@@ -301,6 +319,13 @@ class PPOAgent:
                             log_prob = dist.log_prob(torch.tensor(action).to(device)).item()
        
                     next_obs, reward, terminated, truncated, _ = env.step(action)
+                    
+                    # Cattura frame per video se necessario
+                    if save_video:
+                        rgb_array = env.render()
+                        if rgb_array is not None:
+                            frames.append(rgb_array)
+                    
                     done = terminated or truncated
 
                     # Store experience
@@ -317,11 +342,16 @@ class PPOAgent:
                     self.best_reward = episode_reward
                     self.best_actor.load_state_dict(self.actor.state_dict())
                     self.best_critic.load_state_dict(self.critic.state_dict())
+                
+                # Salva video se necessario
+                if save_video and len(frames) > 0:
+                    self.save_episode_video(frames, episode)
                     
                 # Update agent when buffer is full
                 if self.replay_buffer.size >= self.buffer_size:
                     print(f"Updating agent at episode {episode+1}...")
                     self.update()
+                    print(f"Actor learning rate: {self.actor_optimizer.param_groups[0]['lr']}, critic learning rate: {self.critic_optimizer.param_groups[0]['lr']}")
                     self.replay_buffer.clear()
                     
                 self.episodes_reward.append(episode_reward)
@@ -332,9 +362,11 @@ class PPOAgent:
                 # Debug info ogni 10 episodi per monitoraggio più frequente
                 if (episode + 1) % 10 == 0:
                     avg_reward = np.mean(self.episodes_reward[-10:])
-                    print(f"Episode {episode+1}/{self.max_episodes}, Avg Reward (last 10): {avg_reward:.2f}, Current: {episode_reward:.2f}, Steps: {steps}, Std: {self.std:.4f}")
+                    video_info = " [VIDEO SAVED]" if save_video else ""
+                    print(f"Episode {episode+1}/{self.max_episodes}, Avg Reward (last 10): {avg_reward:.2f}, Current: {episode_reward:.2f}, Steps: {steps}, Std: {self.std:.4f}{video_info}")
                 else:
-                    print(f"Episode {episode+1}/{self.max_episodes}, Reward: {episode_reward:.2f}, Steps: {steps}")
+                    video_info = " [VIDEO SAVED]" if save_video else ""
+                    print(f"Episode {episode+1}/{self.max_episodes}, Reward: {episode_reward:.2f}, Steps: {steps}{video_info}")
                 
                 # Check for interrupt
                 if self.interrupted:
@@ -348,6 +380,11 @@ class PPOAgent:
             self.plot_results(self.episodes_reward)
             
         else: # TEST
+            env = gym.make(self.env_id, render_mode="human",camera_name="track",width=1200, height=800)# if not is_training else "None",camera_name="track",width=1200, height=800)
+            obs_space = env.observation_space.shape[0]
+            
+            action_dim = env.action_space.shape[0] if self.action_type == 'continuous' else env.action_space.n
+            
             if self.action_type == 'continuous':
                 self.actor = net(obs_space, self.actor_hidden_dims, action_dim, torch.tanh).to(device)
             else:
@@ -357,11 +394,19 @@ class PPOAgent:
 
             while True:
                 obs, _ = env.reset()
-                env.render()  # Crea l'attributo viewer                
+                env.render()  # Crea l'attributo viewer
+        
+                if self.action_type == 'continuous':
+                    action_dim = env.action_space.shape[0]
+                    self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32).to(device)
+                    self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32).to(device)
+                else:
+                    action_dim = env.action_space.n                
+        
                 done = False
                 episode_reward = 0
                 steps = 0
-                
+                    
                 while not done and steps < self.max_episode_steps:
                     steps += 1
                     obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(device)
@@ -446,7 +491,7 @@ class PPOAgent:
         plt.tight_layout()
         
         # Save plot
-        filename = f'PPO/training_plot_{self.env_id}'
+        filename = f'PPO/graphs/training_plot_{self.env_id}'
         if interrupted:
             filename += '_interrupted'
         filename += '.png'
@@ -456,10 +501,12 @@ class PPOAgent:
         plt.show()
 
 def main():
-    hyperparameters_set = "inverteddoublependulum"  # Change this to the desired hyperparameters set
+    hyperparameters_set = "halfcheetah"  # Change this to the desired hyperparameters set
+    os.makedirs('PPO/video/' + hyperparameters_set, exist_ok=True)
+    os.makedirs('PPO/graphs', exist_ok=True)
     agent = PPOAgent(hyperparameters_set)
     
-    is_training = True
+    is_training = False
     agent.run(is_training)  
 
 if __name__ == "__main__":
