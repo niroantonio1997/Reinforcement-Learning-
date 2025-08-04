@@ -53,6 +53,17 @@ class PPOAgent:
         self.episodes_reward = []
         self.interrupted = False
         
+    def is_mujoco_env(self, env_id):
+        """
+        Check if the environment is a MuJoCo environment
+        """
+        mujoco_envs = [
+            'Humanoid', 'Ant', 'Hopper', 'Walker2d', 'HalfCheetah', 
+            'InvertedPendulum', 'InvertedDoublePendulum', 'Swimmer',
+            'Reacher', 'Pusher', 'Thrower', 'Striker'
+        ]
+        return any(env_name in env_id for env_name in mujoco_envs) or 'mujoco' in env_id.lower()
+    
     def save_episode_video(self, frames, episode_num):
         """
         Save a sequence of frames as a video
@@ -192,8 +203,8 @@ class PPOAgent:
                 self.critic_optimizer.step()
                 
             # Step scheduler dopo ogni ottimizzazione
-            self.actor_scheduler.step()
-            self.critic_scheduler.step()
+            #self.actor_scheduler.step()
+            #self.critic_scheduler.step()
         
         # Decay entropy coefficient and std
         self.entropy_coef *= self.entropy_coef_decay
@@ -235,7 +246,13 @@ class PPOAgent:
     def run(self, is_training):
 
         if is_training:
-            env = gym.make(self.env_id, render_mode="rgb_array",camera_name="track",width=1200, height=800)# if not is_training else "None",camera_name="track",width=1200, height=800)
+            # Crea l'ambiente con parametri appropriati
+            if self.is_mujoco_env(self.env_id):
+                # Ambiente MuJoCo - usa parametri camera
+                env = gym.make(self.env_id, render_mode="rgb_array", camera_name="track", width=1200, height=800)
+            else:
+                # Ambiente non-MuJoCo - usa solo render_mode
+                env = gym.make(self.env_id, render_mode="rgb_array")
 
             obs_space = env.observation_space.shape[0]
 
@@ -270,8 +287,8 @@ class PPOAgent:
             # Initialize optimizers
             self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr)
             self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
-            self.actor_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.actor_optimizer, gamma=0.999995)
-            self.critic_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.critic_optimizer, gamma=0.999995)
+           # self.actor_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.actor_optimizer, gamma=0.999999995)
+            #self.critic_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.critic_optimizer, gamma=0.999999995)
             
             self.episodes_reward = []  # Initialize here for signal handler
             total_steps = 0
@@ -380,7 +397,14 @@ class PPOAgent:
             self.plot_results(self.episodes_reward)
             
         else: # TEST
-            env = gym.make(self.env_id, render_mode="human",camera_name="track",width=1200, height=800)# if not is_training else "None",camera_name="track",width=1200, height=800)
+            # Crea l'ambiente con parametri appropriati per il test
+            if self.is_mujoco_env(self.env_id):
+                # Ambiente MuJoCo - usa parametri camera
+                env = gym.make(self.env_id, render_mode="human", camera_name="track", width=1200, height=800)
+            else:
+                # Ambiente non-MuJoCo - usa solo render_mode
+                env = gym.make(self.env_id, render_mode="human")
+                
             obs_space = env.observation_space.shape[0]
             
             action_dim = env.action_space.shape[0] if self.action_type == 'continuous' else env.action_space.n
@@ -501,12 +525,12 @@ class PPOAgent:
         plt.show()
 
 def main():
-    hyperparameters_set = "halfcheetah"  # Change this to the desired hyperparameters set
+    hyperparameters_set = "bipedalwalker"  # Change this to the desired hyperparameters set
     os.makedirs('PPO/video/' + hyperparameters_set, exist_ok=True)
     os.makedirs('PPO/graphs', exist_ok=True)
     agent = PPOAgent(hyperparameters_set)
     
-    is_training = False
+    is_training = True
     agent.run(is_training)  
 
 if __name__ == "__main__":

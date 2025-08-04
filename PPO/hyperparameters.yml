@@ -2,15 +2,15 @@ flappybird:
   env_id: FlappyBird-v0
   gamma: 0.99
   buffer_size: 2048
-  train_freq: 10
-  max_episode_steps: 1000
-  max_episodes: 100000
+  train_freq: 50
+  max_episode_steps: 10000
+  max_episodes: 10000
   total_timesteps: 500000
-  max_reward: 100
-  actor_lr:  1e-4
-  critic_lr: 5e-4
-  actor_hidden_dims: [1024]
-  critic_hidden_dims: [1024]
+  max_average_reward: 50  # FlappyBird - sopravvivere 50+ frames è buono
+  actor_lr:  3e-5
+  critic_lr: 1e-4
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
   epsilon: 0.2
   entropy_coef: 0.1
   entropy_coef_decay: 0.99  # Decay factor for entropy coefficient
@@ -24,7 +24,7 @@ cartpole:
   max_episode_steps: 500
   max_episodes: 15000  # Più episodi per dare tempo di imparare
   total_timesteps: 50000
-  max_reward: 475  # CartPole is solved at 475 average reward
+  max_average_reward: 475  # CartPole is solved at 475 average reward
   action_type: discrete
   actor_hidden_dims: [32, 32]  # Rete più piccola per evitare overfitting
   critic_hidden_dims: [32, 32]
@@ -38,16 +38,16 @@ lunarlander:
   env_id: LunarLander-v3
   gamma: 0.99
   buffer_size: 4096
-  train_freq: 5
+  train_freq: 30
   max_episode_steps: 1000
   max_episodes: 2000
   total_timesteps: 200000
-  max_reward: 300
+  max_average_reward: 250
   action_type: discrete
-  actor_hidden_dims: [128, 128]
-  critic_hidden_dims: [128, 128]
-  actor_lr: 3e-4
-  critic_lr: 1e-3
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 1e-4
+  critic_lr: 3e-4
   entropy_coef: 0.01
   entropy_coef_decay: 0.998  # Decay factor for entropy coefficient
 
@@ -59,7 +59,7 @@ pendulum:
   max_episode_steps: 200
   max_episodes: 2000       # Più episodi per convergenza
   total_timesteps: 400000  # Più timesteps totali
-  max_reward: 0            # Reward massimo è 0 (migliore performance)
+  max_average_reward: -150  # Reward massimo è 0 (migliore performance), ma -150 è realistico
   action_type: continuous
   actor_hidden_dims: [128, 128]     # Reti più grandi per complessità
   critic_hidden_dims: [128, 128]
@@ -80,7 +80,7 @@ mountaincar:
   max_episode_steps: 999
   max_episodes: 1500
   total_timesteps: 100000
-  max_reward: 90
+  max_average_reward: 80  # MountainCar - raggiungere la cima con buona efficienza
   action_type: continuous
   actor_hidden_dims: [256, 256]
   critic_hidden_dims: [256, 256]
@@ -97,18 +97,18 @@ mountaincar:
 bipedalwalker:
   env_id: BipedalWalker-v3
   gamma: 0.99
-  buffer_size: 4096  # Buffer grande per azioni continue complesse
-  train_freq: 10     # Più epoche per ambiente difficile
+  buffer_size: 16000  # Buffer grande per azioni continue complesse
+  train_freq: 50     # Più epoche per ambiente difficile
   max_episode_steps: 1600
   max_episodes: 3000
   total_timesteps: 2000000
-  max_reward: 300
+  max_average_reward: 280  # BipedalWalker - camminare stabilmente
   action_type: continuous
-  actor_hidden_dims: [256, 256]  # Reti profonde per complessità
-  critic_hidden_dims: [256, 256]
-  actor_lr: 3e-4
+  actor_hidden_dims: [64, 64]  # Reti profonde per complessità
+  critic_hidden_dims: [64, 64]
+  actor_lr: 1e-4
   critic_lr: 3e-4
-  entropy_coef: 0.01    # Bassa entropy per policy più deterministica
+  entropy_coef: 0.1    # Bassa entropy per policy più deterministica
   entropy_coef_decay: 0.995
   std: 0.1              # Std bassa per controllo preciso
   std_decay: 0.9995     # Decay lento
@@ -123,7 +123,7 @@ humanoid:
   max_episode_steps: 2000
   max_episodes: 1000000
   total_timesteps: 5000000
-  max_reward: 6000
+  max_average_reward: 5000  # Humanoid - locomozione bipede stabile
   action_type: continuous
   actor_hidden_dims: [1025, 512, 256]  # Rete più profonda
   critic_hidden_dims: [1024, 512, 256]
@@ -144,7 +144,7 @@ ant:
   max_episode_steps: 1000
   max_episodes: 2500
   total_timesteps: 1500000
-  max_reward: 6000
+  max_average_reward: 4000  # Ant - locomozione quadrupede
   action_type: continuous
   actor_hidden_dims: [256, 256]
   critic_hidden_dims: [256, 256]
@@ -165,7 +165,7 @@ hopper:
   max_episode_steps: 1000
   max_episodes: 8000
   total_timesteps: 800000
-  max_reward: 3100
+  max_average_reward: 2500  # Hopper - salti stabili e continui
   action_type: continuous
   actor_hidden_dims: [512, 512]
   critic_hidden_dims: [512, 512]
@@ -177,7 +177,7 @@ hopper:
   std_decay: 0.998
   epsilon: 0.2
   lambda: 0.95
-  max_reward: 3000  # Aggiornato per il nuovo ambiente Hopper-v5
+  max_average_reward: 2500  # Aggiornato per il nuovo ambiente Hopper-v5
 
 walker2d:
   env_id: Walker2d-v4
@@ -187,7 +187,7 @@ walker2d:
   max_episode_steps: 1000
   max_episodes: 2000
   total_timesteps: 800000
-  max_reward: 5000
+  max_average_reward: 3000  # Walker2d - camminata bipede stabile
   action_type: continuous
   actor_hidden_dims: [128, 128]
   critic_hidden_dims: [128, 128]
@@ -230,7 +230,7 @@ invertedpendulum:
   max_episode_steps: 1000
   max_episodes: 500
   total_timesteps: 50000
-  max_reward: 1000
+  max_average_reward: 950  # InvertedPendulum - stabilità quasi perfetta
   action_type: continuous
   actor_hidden_dims: [64, 64]
   critic_hidden_dims: [64, 64]
