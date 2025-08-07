@@ -44,6 +44,15 @@ ENV/
 *.gif
 *.svg
 
+# Videos (exclude all video files)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*/video/
+video/
+
 # Logs
 *.log
 
