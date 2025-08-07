@@ -14,6 +14,7 @@ import pickle
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Utilities.network import net
 from Utilities.replay_buffer import ReplayBuffer
+from Utilities.common_functions import is_mujoco_env, save_episode_video, create_signal_handler, plot_results
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -52,57 +53,6 @@ class PPOAgent:
         # Variables for interrupt handling
         self.episodes_reward = []
         self.interrupted = False
-        
-    def is_mujoco_env(self, env_id):
-        """
-        Check if the environment is a MuJoCo environment
-        """
-        mujoco_envs = [
-            'Humanoid', 'Ant', 'Hopper', 'Walker2d', 'HalfCheetah', 
-            'InvertedPendulum', 'InvertedDoublePendulum', 'Swimmer',
-            'Reacher', 'Pusher', 'Thrower', 'Striker'
-        ]
-        return any(env_name in env_id for env_name in mujoco_envs) or 'mujoco' in env_id.lower()
-    
-    def save_episode_video(self, frames, episode_num):
-        """
-        Save a sequence of frames as a video
-        """
-        if len(frames) > 0:
-            import imageio
-            filename = f'PPO/video/{self.hyperparameters_set}/episode_{episode_num}_{self.env_id}.mp4'
-            # Salva come video MP4 con 30 fps
-            imageio.mimsave(filename, frames, fps=30, codec='libx264')
-            print(f"Episode video saved as {filename}")
-        
-        
-    #gestisce il segnale di interruzione Ctrl+C. Plotta i dati di training e salva i modelli    
-    def signal_handler(self, signum, frame):
-        """Handle Ctrl+C interrupt"""
-        print("\n\n=== TRAINING INTERRUPTED ===")
-        print("Saving models and plotting results...")
-        self.interrupted = True
-        
-        # Save models if they exist
-        if hasattr(self, 'best_actor') and hasattr(self, 'best_critic'):
-            torch.save(self.best_actor.state_dict(), f'PPO/nets/{self.env_id}_actor.pth')
-            torch.save(self.best_critic.state_dict(), f'PPO/nets/{self.env_id}_critic.pth')
-
-        # Save training data
-        with open(f'PPO/training_data_{self.env_id}_interrupted.pkl', 'wb') as f:
-            pickle.dump({
-                'episodes_reward': self.episodes_reward,
-                'env_id': self.env_id,
-                'interrupted_at_episode': len(self.episodes_reward)
-            }, f)
-        print(f"Training data saved as training_data_{self.env_id}_interrupted.pkl")
-        
-        # Plot results
-        if len(self.episodes_reward) > 0:
-            self.plot_results(self.episodes_reward, interrupted=True)
-        
-        print("=== CLEANUP COMPLETE ===")
-        sys.exit(0)
 
     #calcola il Generalized Advantage Estimation (GAE)
     def compute_gae(self, rewards, dones, values, next_value=0):
@@ -203,8 +153,8 @@ class PPOAgent:
                 self.critic_optimizer.step()
                 
             # Step scheduler dopo ogni ottimizzazione
-            #self.actor_scheduler.step()
-            #self.critic_scheduler.step()
+            self.actor_scheduler.step()
+            self.critic_scheduler.step()
         
         # Decay entropy coefficient and std
         self.entropy_coef *= self.entropy_coef_decay
@@ -247,12 +197,14 @@ class PPOAgent:
 
         if is_training:
             # Crea l'ambiente con parametri appropriati
-            if self.is_mujoco_env(self.env_id):
+            if is_mujoco_env(self.env_id):
                 # Ambiente MuJoCo - usa parametri camera
                 env = gym.make(self.env_id, render_mode="rgb_array", camera_name="track", width=1200, height=800)
             else:
                 # Ambiente non-MuJoCo - usa solo render_mode
                 env = gym.make(self.env_id, render_mode="rgb_array")
+                
+            env._max_episode_steps = self.max_episode_steps  # Imposta il limite di passi per l'episodio
 
             obs_space = env.observation_space.shape[0]
 
@@ -264,7 +216,7 @@ class PPOAgent:
                 action_dim = env.action_space.n
             
             # Setup signal handler for Ctrl+C
-            signal.signal(signal.SIGINT, self.signal_handler)
+            signal.signal(signal.SIGINT, create_signal_handler(self, "PPO"))
             print("=== TRAINING STARTED ===")
             print("Press Ctrl+C to safely interrupt and save progress")
             print("=" * 50)
@@ -287,8 +239,8 @@ class PPOAgent:
             # Initialize optimizers
             self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr)
             self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
-           # self.actor_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.actor_optimizer, gamma=0.999999995)
-            #self.critic_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.critic_optimizer, gamma=0.999999995)
+            self.actor_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.actor_optimizer, gamma=0.999999995)
+            self.critic_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.critic_optimizer, gamma=0.999999995)
             
             self.episodes_reward = []  # Initialize here for signal handler
             total_steps = 0
@@ -362,7 +314,7 @@ class PPOAgent:
                 
                 # Salva video se necessario
                 if save_video and len(frames) > 0:
-                    self.save_episode_video(frames, episode)
+                    save_episode_video(frames, episode,  self.hyperparameters_set, self.env_id, "PPO")
                     
                 # Update agent when buffer is full
                 if self.replay_buffer.size >= self.buffer_size:
@@ -394,17 +346,19 @@ class PPOAgent:
             torch.save(self.best_critic.state_dict(), f'PPO/nets/{self.env_id}_critic.pth')
 
             # Plot results
-            self.plot_results(self.episodes_reward)
-            
-        else: # TEST
+            plot_results(self.episodes_reward, self.env_id, self.max_average_reward, "PPO")            
+        
+        ################# TEST MODE #################    
+        else: 
             # Crea l'ambiente con parametri appropriati per il test
-            if self.is_mujoco_env(self.env_id):
+            if is_mujoco_env(self.env_id):
                 # Ambiente MuJoCo - usa parametri camera
-                env = gym.make(self.env_id, render_mode="human", camera_name="track", width=1200, height=800)
+                env = gym.make(self.env_id, render_mode="rgb_array", camera_name="track", width=1200, height=800)
             else:
                 # Ambiente non-MuJoCo - usa solo render_mode
-                env = gym.make(self.env_id, render_mode="human")
+                env = gym.make(self.env_id, render_mode="rgb_array")
                 
+            env._max_episode_steps = self.max_episode_steps  # Imposta il limite di passi per l'episodio
             obs_space = env.observation_space.shape[0]
             
             action_dim = env.action_space.shape[0] if self.action_type == 'continuous' else env.action_space.n
@@ -415,122 +369,53 @@ class PPOAgent:
                 self.actor = net(obs_space, self.actor_hidden_dims, action_dim).to(device)
             self.actor.load_state_dict(torch.load(f'PPO/nets/{self.env_id}_actor.pth'))
             self.actor.eval()
-
-            while True:
-                obs, _ = env.reset()
-                env.render()  # Crea l'attributo viewer
-        
-                if self.action_type == 'continuous':
-                    action_dim = env.action_space.shape[0]
-                    self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32).to(device)
-                    self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32).to(device)
-                else:
-                    action_dim = env.action_space.n                
-        
-                done = False
-                episode_reward = 0
-                steps = 0
-                    
-                while not done and steps < self.max_episode_steps:
-                    steps += 1
-                    obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(device)
-                    
-                    with torch.no_grad():
-                        if self.action_type == 'continuous':
-                            # Use deterministic policy for testing
-                            mu = self.actor(obs_tensor)
-                            mu_scaled = self.action_low + (mu + 1.0) * 0.5 * (self.action_high - self.action_low)
-                            action = mu_scaled.detach().cpu().numpy().flatten().astype(np.float32)
-                        else:
-                            logits = self.actor(obs_tensor)
-                            action = torch.argmax(logits, dim=-1).item()
-        
-                    next_obs, reward, terminated, truncated, _ = env.step(action)
-                    done = terminated or truncated
-                    
-                    obs = next_obs
-                    episode_reward += reward 
-                    
-                print(f"Test Episode Reward: {episode_reward:.2f}, Steps: {steps}")
-
-    def plot_results(self, episodes_reward, interrupted=False):
-        """
-        Plot training results
-        """
-        if len(episodes_reward) == 0:
-            print("No episodes completed yet, cannot plot results.")
-            return
+            frames = []  # Lista per salvare i frame del video
+            obs, _ = env.reset()
             
-        window_size = min(100, len(episodes_reward))
-        smoothed_rewards = []
-        for i in range(len(episodes_reward)):
-            start_idx = max(0, i - window_size + 1)
-            smoothed_rewards.append(np.mean(episodes_reward[start_idx:i+1]))
-        
-        plt.figure(figsize=(15, 5))
-        
-        # Full training progress
-        plt.subplot(1, 3, 1)
-        plt.plot(episodes_reward, alpha=0.3, label='Raw', color='lightblue')
-        plt.plot(smoothed_rewards, label=f'Smoothed ({window_size})', color='blue')
-        plt.xlabel('Episode')
-        plt.ylabel('Reward')
-        title = f'Training Progress - {self.env_id}'
-        if interrupted:
-            title += f' (INTERRUPTED at episode {len(episodes_reward)})'
-        plt.title(title)
-        plt.legend()
-        plt.grid(True)
-        
-        # Recent performance
-        plt.subplot(1, 3, 2)
-        recent_episodes = min(200, len(episodes_reward))
-        plt.plot(smoothed_rewards[-recent_episodes:], color='green')
-        plt.xlabel(f'Episode (last {recent_episodes})')
-        plt.ylabel('Smoothed Reward')
-        plt.title('Recent Performance')
-        plt.grid(True)
-        
-        # Statistics
-        plt.subplot(1, 3, 3)
-        stats_text = f"""
-            Training Statistics:
-            Episodes completed: {len(episodes_reward)}
-            Max reward: {max(episodes_reward):.2f}
-            Mean reward: {np.mean(episodes_reward):.2f}
-            Last 100 mean: {np.mean(episodes_reward[-100:]):.2f}
-            Std deviation: {np.std(episodes_reward):.2f}
-
-            Target reward: {self.max_average_reward}
-            Environment: {self.env_id}
-            """
-        if interrupted:
-            stats_text += "\nSTATUS: INTERRUPTED"
-        else:
-            stats_text += "\nSTATUS: COMPLETED"
-            
-        plt.text(0.1, 0.5, stats_text, fontsize=10, verticalalignment='center')
-        plt.axis('off')
-        
-        plt.tight_layout()
-        
-        # Save plot
-        filename = f'PPO/graphs/training_plot_{self.env_id}'
-        if interrupted:
-            filename += '_interrupted'
-        filename += '.png'
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
-        print(f"Plot saved as {filename}")
-        
-        plt.show()
+            if self.action_type == 'continuous':
+                action_dim = env.action_space.shape[0]
+                self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32).to(device)
+                self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32).to(device)
+            else:
+                action_dim = env.action_space.n                
+    
+            done = False
+            episode_reward = 0
+            steps = 0
+            episode = 0
+            while not done and steps < self.max_episode_steps:
+                steps += 1
+                obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(device)
+                
+                with torch.no_grad():
+                    if self.action_type == 'continuous':
+                        # Use deterministic policy for testing
+                        mu = self.actor(obs_tensor)
+                        mu_scaled = self.action_low + (mu + 1.0) * 0.5 * (self.action_high - self.action_low)
+                        action = mu_scaled.detach().cpu().numpy().flatten().astype(np.float32)
+                    else:
+                        logits = self.actor(obs_tensor)
+                        action = torch.argmax(logits, dim=-1).item()
+    
+                next_obs, reward, terminated, truncated, _ = env.step(action)
+                rgb_array = env.render()
+                if rgb_array is not None:
+                    frames.append(rgb_array)
+                done = terminated or truncated
+                
+                obs = next_obs
+                episode_reward += reward 
+            save_episode_video(frames, None,  self.hyperparameters_set, self.env_id, "PPO")
+                
+            print(f"Test Episode Reward: {episode_reward:.2f}, Steps: {steps}")
 
 def main():
-    hyperparameters_set = "bipedalwalker"  # Change this to the desired hyperparameters set
+    hyperparameters_set = "flappybird"  # Change this to the desired hyperparameters set
     os.makedirs('PPO/video/' + hyperparameters_set, exist_ok=True)
     os.makedirs('PPO/graphs', exist_ok=True)
     agent = PPOAgent(hyperparameters_set)
     
-    is_training = True
+    is_training = False  # Set to True for training, False for testing
     agent.run(is_training)  
 
 if __name__ == "__main__":

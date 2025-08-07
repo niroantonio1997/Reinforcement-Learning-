@@ -1,0 +1,207 @@
+pendulum: 
+  env_id: Pendulum-v1
+  gamma: 0.99
+  tau: 0.005  # Leggermente più alto per convergenza più veloce
+  batch_size: 64
+  exploration_noise_std: 0.1  
+  buffer_size: 100000  
+  train_freq: 1           # Train ad ogni step (molto importante!)
+  max_episode_steps: 200  # Default di Pendulum
+  total_timesteps: 100000  # Riduci per test più veloci
+  max_episodes: 1000
+  max_average_reward: -150  # Target per Pendulum (-200 è random, -150 è buono)
+  actor_hidden_dims: [128, 128]
+  critic_hidden_dims: [128, 128]
+  actor_lr: 0.00005
+  critic_lr: 0.0001
+
+
+
+walker: 
+  env_id: BipedalWalker-v3
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.2
+  buffer_size: 2000000
+  train_freq: 1
+  max_episode_steps: 1600  # Default di BipedalWalker
+  total_timesteps: 3000000
+  max_episodes: 2000
+  max_average_reward: 300  # Target per BipedalWalker
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.00005
+  critic_lr: 0.0001
+
+# ==== MUJOCO ENVIRONMENTS ====
+
+ant:
+  env_id: Ant-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 1024
+  exploration_noise_std: 0.1
+  buffer_size: 1000000
+  train_freq: 1
+  max_episode_steps: 1000
+  total_timesteps: 2000000
+  max_episodes: 3000
+  max_average_reward: 6000  # Target per Ant (reward alto)
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001
+
+halfcheetah:
+  env_id: HalfCheetah-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 256
+  exploration_noise_std: 0.1
+  buffer_size: 1000000
+  train_freq: 1
+  max_episode_steps: 1000
+  total_timesteps: 2000000
+  max_episodes: 3000
+  max_average_reward: 4000  # Target per HalfCheetah
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001
+
+hopper:
+  env_id: Hopper-v5
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 1024
+  exploration_noise_std: 0.1
+  buffer_size: 1000000
+  train_freq: 1
+  max_episode_steps: 5000
+  total_timesteps: 1000000
+  max_episodes: 2000
+  max_average_reward: 3500  # Target per Hopper
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 1e-3
+  critic_lr: 0.001
+
+walker2d:
+  env_id: Walker2d-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.1
+  buffer_size: 1000000
+  train_freq: 1
+  max_episode_steps: 1000
+  total_timesteps: 1500000
+  max_episodes: 2500
+  max_average_reward: 4000  # Target per Walker2d
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001
+
+humanoid:
+  env_id: Humanoid-v5
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 2048
+  exploration_noise_std: 0.1
+  buffer_size: 2000000
+  train_freq: 1
+  max_episode_steps: 2000
+  total_timesteps: 5000000
+  max_episodes: 100000
+  max_average_reward: 6000  # Target per Humanoid (molto difficile)
+  actor_hidden_dims: [2048, 1024]
+  critic_hidden_dims: [2048, 1024]
+  actor_lr: 0.00005
+  critic_lr: 0.0005
+
+swimmer:
+  env_id: Swimmer-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.1
+  buffer_size: 500000
+  train_freq: 1
+  max_episode_steps: 1000
+  total_timesteps: 1000000
+  max_episodes: 2000
+  max_average_reward: 500  # Target per Swimmer
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001
+
+invertedpendulum:
+  env_id: InvertedPendulum-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 64
+  exploration_noise_std: 0.1
+  buffer_size: 100000
+  train_freq: 1
+  max_episode_steps: 1000
+  total_timesteps: 200000
+  max_episodes: 500
+  max_average_reward: 950  # Target per InvertedPendulum (max=1000)
+  actor_hidden_dims: [128, 128]
+  critic_hidden_dims: [128, 128]
+  actor_lr: 0.001
+  critic_lr: 0.001
+
+inverteddoublependulum:
+  env_id: InvertedDoublePendulum-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.1
+  buffer_size: 500000
+  train_freq: 1
+  max_episode_steps: 1000
+  total_timesteps: 500000
+  max_episodes: 1000
+  max_average_reward: 9000  # Target per InvertedDoublePendulum (max~9400)
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001
+
+reacher:
+  env_id: Reacher-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.1
+  buffer_size: 500000
+  train_freq: 1
+  max_episode_steps: 50
+  total_timesteps: 200000
+  max_episodes: 5000
+  max_average_reward: -5  # Target per Reacher (reward negativo, -5 è buono)
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001
+
+pusher:
+  env_id: Pusher-v4
+  gamma: 0.99
+  tau: 0.005
+  batch_size: 128
+  exploration_noise_std: 0.1
+  buffer_size: 1000000
+  train_freq: 1
+  max_episode_steps: 100
+  total_timesteps: 1000000
+  max_episodes: 15000
+  max_average_reward: -20  # Target per Pusher (reward negativo)
+  actor_hidden_dims: [256, 256]
+  critic_hidden_dims: [256, 256]
+  actor_lr: 0.0001
+  critic_lr: 0.001

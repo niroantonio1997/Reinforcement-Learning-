@@ -13,6 +13,7 @@ import pickle
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Utilities.network import net
 from Utilities.replay_buffer import ReplayBuffer
+from Utilities.common_functions import is_mujoco_env, save_episode_video, create_signal_handler, plot_results
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -44,72 +45,23 @@ class DDPGAgent:
         # Parametri per exploration noise decay
         self.noise_std = self.exploration_noise_std
         self.noise_decay = 0.995
-        self.min_noise = 0.01
+        self.min_noise = 0.0001
         
         # Variables for interrupt handling
         self.episodes_reward = []
         self.interrupted = False
         
-    def is_mujoco_env(self, env_id):
-        """
-        Check if the environment is a MuJoCo environment
-        """
-        mujoco_envs = [
-            'Humanoid', 'Ant', 'Hopper', 'Walker2d', 'HalfCheetah', 
-            'InvertedPendulum', 'InvertedDoublePendulum', 'Swimmer',
-            'Reacher', 'Pusher', 'Thrower', 'Striker'
-        ]
-        return any(env_name in env_id for env_name in mujoco_envs) or 'mujoco' in env_id.lower()
-    
-    def save_episode_video(self, frames, episode_num):
-        """
-        Save a sequence of frames as a video
-        """
-        if len(frames) > 0:
-            import imageio
-            filename = f'DDPG/video/{self.hyperparameters_set}/episode_{episode_num}_{self.env_id}.mp4'
-            # Salva come video MP4 con 30 fps
-            imageio.mimsave(filename, frames, fps=30, codec='libx264')
-            print(f"Episode video saved as {filename}")
-        
-    def signal_handler(self, signum, frame):
-        """Handle Ctrl+C interrupt"""
-        print("\n\n=== TRAINING INTERRUPTED ===")
-        print("Saving models and plotting results...")
-        self.interrupted = True
-        
-        # Save models if they exist
-        if hasattr(self, 'best_actor') and hasattr(self, 'best_critic'):
-            torch.save(self.best_actor.state_dict(), f'DDPG/nets/{self.env_id}_actor.pth')
-            torch.save(self.best_critic.state_dict(), f'DDPG/nets/{self.env_id}_critic.pth')
-
-        # Save training data
-        with open(f'DDPG/training_data_{self.env_id}_interrupted.pkl', 'wb') as f:
-            pickle.dump({
-                'episodes_reward': self.episodes_reward,
-                'env_id': self.env_id,
-                'interrupted_at_episode': len(self.episodes_reward)
-            }, f)
-        print(f"Training data saved as training_data_{self.env_id}_interrupted.pkl")
-        
-        # Plot results
-        if len(self.episodes_reward) > 0:
-            self.plot_results(self.episodes_reward, interrupted=True)
-        
-        print("=== CLEANUP COMPLETE ===")
-        sys.exit(0)
-        
-        
     def run(self, is_training):
 
         if is_training:
             # Crea l'ambiente con parametri appropriati
-            if self.is_mujoco_env(self.env_id):
+            if is_mujoco_env(self.env_id):
                 # Ambiente MuJoCo - usa parametri camera
                 env = gym.make(self.env_id, render_mode="rgb_array", camera_name="track", width=1200, height=800)
             else:
                 # Ambiente non-MuJoCo - usa solo render_mode
                 env = gym.make(self.env_id, render_mode="rgb_array")
+            env._max_episode_steps = self.max_episode_steps  # Imposta il limite di passi per l'episodio
 
             obs_space = env.observation_space.shape[0]
             action_dim = env.action_space.shape[0]
@@ -121,7 +73,7 @@ class DDPGAgent:
             action_bias = (self.action_high + self.action_low) / 2.0
             
             # Setup signal handler for Ctrl+C
-            signal.signal(signal.SIGINT, self.signal_handler)
+            signal.signal(signal.SIGINT, create_signal_handler(self))
             print("=== DDPG TRAINING STARTED ===")
             print("Press Ctrl+C to safely interrupt and save progress")
             print("=" * 50)
@@ -215,7 +167,7 @@ class DDPGAgent:
                 
                 # Salva video se necessario
                 if save_video and len(frames) > 0:
-                    self.save_episode_video(frames, episode)
+                    save_episode_video(frames, episode, "DDPG", self.env_id)
                 
                 self.episodes_reward.append(episode_reward)
                 
@@ -247,17 +199,17 @@ class DDPGAgent:
             torch.save(self.best_critic.state_dict(), f'DDPG/nets/{self.env_id}_critic.pth')
 
             # Plot results
-            self.plot_results(self.episodes_reward)
+            plot_results(self.episodes_reward, "DDPG", self.env_id, self.max_average_reward)
             
         else: # TEST
             # Crea l'ambiente con parametri appropriati per il test
-            if self.is_mujoco_env(self.env_id):
+            if is_mujoco_env(self.env_id):
                 # Ambiente MuJoCo - usa parametri camera
                 env = gym.make(self.env_id, render_mode="human", camera_name="track", width=1200, height=800)
             else:
                 # Ambiente non-MuJoCo - usa solo render_mode
                 env = gym.make(self.env_id, render_mode="human")
-                
+            env._max_episode_steps = self.max_episode_steps  # Imposta il limite di passi per l'episodio
             obs_space = env.observation_space.shape[0]
             action_dim = env.action_space.shape[0]
             
@@ -337,77 +289,6 @@ class DDPGAgent:
         for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-    def plot_results(self, episodes_reward, interrupted=False):
-        """
-        Plot training results
-        """
-        if len(episodes_reward) == 0:
-            print("No episodes completed yet, cannot plot results.")
-            return
-            
-        window_size = min(100, len(episodes_reward))
-        smoothed_rewards = []
-        for i in range(len(episodes_reward)):
-            start_idx = max(0, i - window_size + 1)
-            smoothed_rewards.append(np.mean(episodes_reward[start_idx:i+1]))
-        
-        plt.figure(figsize=(15, 5))
-        
-        # Full training progress
-        plt.subplot(1, 3, 1)
-        plt.plot(episodes_reward, alpha=0.3, label='Raw', color='lightblue')
-        plt.plot(smoothed_rewards, label=f'Smoothed ({window_size})', color='blue')
-        plt.xlabel('Episode')
-        plt.ylabel('Reward')
-        title = f'DDPG Training Progress - {self.env_id}'
-        if interrupted:
-            title += f' (INTERRUPTED at episode {len(episodes_reward)})'
-        plt.title(title)
-        plt.legend()
-        plt.grid(True)
-        
-        # Recent performance
-        plt.subplot(1, 3, 2)
-        recent_episodes = min(200, len(episodes_reward))
-        plt.plot(smoothed_rewards[-recent_episodes:], color='green')
-        plt.xlabel(f'Episode (last {recent_episodes})')
-        plt.ylabel('Smoothed Reward')
-        plt.title('Recent Performance')
-        plt.grid(True)
-        
-        # Statistics
-        plt.subplot(1, 3, 3)
-        stats_text = f"""
-            DDPG Training Statistics:
-            Episodes completed: {len(episodes_reward)}
-            Max reward: {max(episodes_reward):.2f}
-            Mean reward: {np.mean(episodes_reward):.2f}
-            Last 100 mean: {np.mean(episodes_reward[-100:]):.2f}
-            Std deviation: {np.std(episodes_reward):.2f}
-
-            Target reward: {self.max_average_reward}
-            Environment: {self.env_id}
-            """
-        if interrupted:
-            stats_text += "\nSTATUS: INTERRUPTED"
-        else:
-            stats_text += "\nSTATUS: COMPLETED"
-            
-        plt.text(0.1, 0.5, stats_text, fontsize=10, verticalalignment='center')
-        plt.axis('off')
-        
-        plt.tight_layout()
-        
-        # Save plot
-        filename = f'DDPG/graphs/training_plot_{self.env_id}'
-        if interrupted:
-            filename += '_interrupted'
-        filename += '.png'
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
-        print(f"Plot saved as {filename}")
-        
-        plt.show()
-
 
 def main():
     # Choose your environment:
@@ -415,13 +296,13 @@ def main():
     # Medium: "walker", "hopper", "walker2d", "reacher"
     # Complex: "ant", "halfcheetah", "humanoid", "swimmer", "pusher"
     
-    hyperparameters_set = "pendulum"  # Change this to desired environment
+    hyperparameters_set = "swimmer"  # Change this to desired environment
     
     os.makedirs('DDPG/video/' + hyperparameters_set, exist_ok=True)
     os.makedirs('DDPG/graphs', exist_ok=True)
     agent = DDPGAgent(hyperparameters_set)
     
-    is_training = True
+    is_training = False
     agent.run(is_training)  
 
 

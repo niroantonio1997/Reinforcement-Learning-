@@ -71,7 +71,7 @@ halfcheetah:
   critic_lr: 0.001
 
 hopper:
-  env_id: Hopper-v4
+  env_id: Hopper-v5
   gamma: 0.99
   tau: 0.005
   batch_size: 128
@@ -105,19 +105,19 @@ walker2d:
   critic_lr: 0.001
 
 humanoid:
-  env_id: Humanoid-v4
+  env_id: Humanoid-v5
   gamma: 0.99
   tau: 0.005
-  batch_size: 256
+  batch_size: 1024
   exploration_noise_std: 0.1
   buffer_size: 2000000
   train_freq: 1
-  max_episode_steps: 1000
+  max_episode_steps: 2000
   total_timesteps: 5000000
-  max_episodes: 10000
+  max_episodes: 100000
   max_average_reward: 6000  # Target per Humanoid (molto difficile)
-  actor_hidden_dims: [512, 512, 256]
-  critic_hidden_dims: [512, 512, 256]
+  actor_hidden_dims: [2048, 1024]
+  critic_hidden_dims: [2048, 1024]
   actor_lr: 0.00005
   critic_lr: 0.0005
 
@@ -132,7 +132,7 @@ swimmer:
   max_episode_steps: 1000
   total_timesteps: 1000000
   max_episodes: 2000
-  max_average_reward: 100  # Target per Swimmer
+  max_average_reward: 500  # Target per Swimmer
   actor_hidden_dims: [256, 256]
   critic_hidden_dims: [256, 256]
   actor_lr: 0.0001
